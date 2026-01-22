@@ -10,129 +10,183 @@ WINDOW_WIDTH = 1280
 WINDOW_HEIGHT = 720
 WINDOW_TITLE = "Platformer"
 
-# Constants used to scale our sprites from their original size
 TILE_SCALING = 0.5
-
-# Movement speed of player, in pixels per frame
 PLAYER_MOVEMENT_SPEED = 5
 GRAVITY = 1
 PLAYER_JUMP_SPEED = 20
 PLAYER_SCALE = 0.5
+FADE_SPEED = 8   # --- AGGIUNTO ---
 
 
 class GameView(arcade.Window):
-    """
-    Main application class.
-    """
 
     def __init__(self):
 
-        # Call the parent class and set up the window
-        super().__init__(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE)
-
-        # Variable to hold our texture for our player
-        self.player_texture = arcade.load_texture(
-           "C:/Users/saul.vianello/Downloads/ciao/Fantasy-game-on-fire/Bello.png"
+        super().__init__(
+            WINDOW_WIDTH,
+            WINDOW_HEIGHT,
+            WINDOW_TITLE,
+            resizable=True,
+            fullscreen=True
         )
 
-        # Separate variable that holds the player sprite
-        self.player_sprite = arcade.Sprite(self.player_texture, scale = PLAYER_SCALE)
+        # --- AGGIUNTO ---
+        self.in_house = False
+        self.is_fading = False
+        self.fade_alpha = 0
+        self.fade_direction = 1
+        self.fade_target = None
+
+        # Player (TUO CODICE)
+        self.player_texture = arcade.load_texture(
+            "C:/Users/saul.vianello/Downloads/ciao/Fantasy-game-on-fire/Bello.png"
+        )
+        self.player_sprite = arcade.Sprite(self.player_texture, scale=PLAYER_SCALE)
         self.player_sprite.center_x = 64
         self.player_sprite.center_y = 128
+        self.player_sprite.scale = 0.3
 
-        # SpriteList for our player
         self.player_list = arcade.SpriteList()
         self.player_list.append(self.player_sprite)
 
         self.background = None
 
-        # SpriteList for our boxes and ground
-        # Putting our ground and box Sprites in the same SpriteList
-        # will make it easier to perform collision detection against
-        # them later on. Setting the spatial hash to True will make
-        # collision detection much faster if the objects in this
-        # SpriteList do not move.
+        # Terreno (TUO CODICE)
         self.wall_list = arcade.SpriteList(use_spatial_hash=True)
 
-        # Create the ground
-        # This shows using a loop to place multiple sprites horizontally
         for x in range(0, 1250, 64):
             wall = arcade.Sprite(":resources:images/tiles/grassMid.png", scale=TILE_SCALING)
             wall.center_x = x
             wall.center_y = 32
             self.wall_list.append(wall)
 
-        # Put some crates on the ground
-        # This shows using a coordinate list to place sprites
-        coordinate_list = [[512, 96], [256, 96], [768, 96]]
+        # --- CASA (AGGIUNTO) ---
+        self.house_sprite = arcade.Sprite(
+            ":resources:images/tiles/house.png",
+            scale=0.9
+        )
+        self.house_sprite.center_x = 1100
+        self.house_sprite.center_y = 160
 
-        
-        # Create a Platformer Physics Engine.
-        # This will handle moving our player as well as collisions between
-        # the player sprite and whatever SpriteList we specify for the walls.
-        # It is important to supply static platforms to the walls parameter. There is a
-        # platforms parameter that is intended for moving platforms.
-        # If a platform is supposed to move, and is added to the walls list,
-        # it will not be moved.
+        # Fisica (TUO CODICE)
         self.physics_engine = arcade.PhysicsEnginePlatformer(
-            self.player_sprite, walls=self.wall_list, gravity_constant=GRAVITY
+            self.player_sprite,
+            walls=self.wall_list,
+            gravity_constant=GRAVITY
+        )
+
+        # --- SFONDI (AGGIUNTO) ---
+        self.background_outside = arcade.load_texture(
+            ":resources:images/backgrounds/abstract_2.jpg"
+        )
+        self.background_inside = arcade.load_texture(
+            ":resources:images/backgrounds/abstract_1.jpg"
         )
 
         self.background_color = arcade.csscolor.CORNFLOWER_BLUE
 
     def setup(self):
-        """Set up the game here. Call this function to restart the game."""
-        self.background = arcade.load_texture("C:/Users/saul.vianello/Downloads/ciao/Fantasy-game-on-fire/SfondoFigo.png")
-
-
+        pass
 
     def on_draw(self):
-        """Render the screen."""
-        arcade.draw_texture_rect(
-            self.background,
-            arcade.LBWH(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT),
-        )
-        # Clear the screen to the background color
+        arcade.start_render()
 
-        # Draw our sprites
+        # --- AGGIUNTO ---
+        if self.in_house:
+            arcade.draw_texture_rect(
+                self.background_inside,
+                arcade.LBWH(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT),
+            )
+        else:
+            arcade.draw_texture_rect(
+                self.background_outside,
+                arcade.LBWH(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT),
+            )
+            self.wall_list.draw()
+            self.house_sprite.draw()
+
         self.player_list.draw()
-        self.wall_list.draw()
 
-        
-
+        # --- FADE (AGGIUNTO) ---
+        if self.is_fading:
+            arcade.draw_rectangle_filled(
+                WINDOW_WIDTH // 2,
+                WINDOW_HEIGHT // 2,
+                WINDOW_WIDTH,
+                WINDOW_HEIGHT,
+                (0, 0, 0, self.fade_alpha)
+            )
 
     def on_update(self, delta_time):
-        """Movement and Game Logic"""
 
-        # Move the player using our physics engine
         self.physics_engine.update()
 
-        self.babbo.center_x += change_x
-        self.babbo.center_y += change_y
+        # --- ENTRATA CASA (AGGIUNTO) ---
+        if not self.in_house and not self.is_fading:
+            if arcade.check_for_collision(self.player_sprite, self.house_sprite):
+                self.start_fade("enter")
+
+        # --- LOGICA FADE (AGGIUNTO) ---
+        if self.is_fading:
+            self.fade_alpha += FADE_SPEED * self.fade_direction
+
+            if self.fade_alpha >= 255:
+                self.fade_alpha = 255
+                self.fade_direction = -1
+
+                if self.fade_target == "enter":
+                    self.in_house = True
+                    self.player_sprite.center_x = WINDOW_WIDTH // 2
+                    self.player_sprite.center_y = 120
+                else:
+                    self.in_house = False
+                    self.player_sprite.center_x = 1000
+                    self.player_sprite.center_y = 150
+
+            if self.fade_alpha <= 0:
+                self.fade_alpha = 0
+                self.is_fading = False
+
+    # --- AGGIUNTO ---
+    def start_fade(self, target):
+        self.is_fading = True
+        self.fade_alpha = 0
+        self.fade_direction = 1
+        self.fade_target = target
+        self.player_sprite.change_x = 0
+        self.player_sprite.change_y = 0
 
     def on_key_press(self, key, modifiers):
-        """Called whenever a key is pressed."""
 
-        if key == arcade.key.UP or key == arcade.key.W:
-            if self.physics_engine.can_jump():
+        # Salto (TUO CODICE)
+        if key in (arcade.key.UP, arcade.key.W):
+            if not self.in_house and self.physics_engine.can_jump():
                 self.player_sprite.change_y = PLAYER_JUMP_SPEED
 
-        if key == arcade.key.LEFT or key == arcade.key.A:
+        # Movimento (TUO CODICE)
+        if key in (arcade.key.LEFT, arcade.key.A):
             self.player_sprite.change_x = -PLAYER_MOVEMENT_SPEED
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
+        elif key in (arcade.key.RIGHT, arcade.key.D):
             self.player_sprite.change_x = PLAYER_MOVEMENT_SPEED
 
-    def on_key_release(self, key, modifiers):
-        """Called whenever a key is released."""
+        # --- USCITA CASA (AGGIUNTO) ---
+        if key == arcade.key.E and self.in_house and not self.is_fading:
+            self.start_fade("exit")
 
-        if key == arcade.key.LEFT or key == arcade.key.A:
+        if key == arcade.key.ESCAPE:
+            self.set_fullscreen(False)
+
+    def on_key_release(self, key, modifiers):
+
+        if key in (arcade.key.LEFT, arcade.key.A,
+                   arcade.key.RIGHT, arcade.key.D):
             self.player_sprite.change_x = 0
-        elif key == arcade.key.RIGHT or key == arcade.key.D:
-            self.player_sprite.change_x = 0
+
+        if key == arcade.key.BACKSLASH:
+            self.set_fullscreen(True)
 
 
 def main():
-    """Main function"""
     window = GameView()
     window.setup()
     arcade.run()
@@ -140,4 +194,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
